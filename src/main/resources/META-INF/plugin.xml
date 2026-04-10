@@ -1,8 +1,9 @@
 <idea-plugin>
     <id>com.github.codeplangui</id>
     <name>CodePlanGUI</name>
+    <version>0.1.0</version>
     <vendor>codeplangui</vendor>
-    <description>Scaffold for the CodePlanGUI IntelliJ plugin.</description>
+    <description>Custom API AI assistant with Chat and Commit Message generation</description>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>Git4Idea</depends>
@@ -10,5 +11,25 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
             serviceImplementation="com.github.codeplangui.settings.PluginSettings"/>
+
+        <toolWindow id="CodePlanGUI"
+                    anchor="right"
+                    factoryClass="com.github.codeplangui.ChatToolWindowFactory"
+                    icon="/icons/toolwindow.svg"
+                    canCloseContents="false"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.github.codeplangui.settings.PluginSettingsConfigurable"
+            displayName="CodePlanGUI"/>
     </extensions>
+
+    <actions>
+        <action id="CodePlanGUI.GenerateCommitMessage"
+                class="com.github.codeplangui.action.GenerateCommitMessageAction"
+                text="✨ Generate Commit Message"
+                icon="/icons/generate.svg">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
+        </action>
+    </actions>
 </idea-plugin>

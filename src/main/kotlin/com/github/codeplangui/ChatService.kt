@@ -15,16 +15,6 @@ import kotlinx.coroutines.launch
 import okhttp3.sse.EventSource
 import java.util.UUID
 
-interface BridgeHandler {
-    fun notifyStart(msgId: String)
-
-    fun notifyToken(token: String)
-
-    fun notifyEnd(msgId: String)
-
-    fun notifyError(message: String)
-}
-
 class ChatService(private val project: Project) {
 
     private val client = OkHttpSseClient()
