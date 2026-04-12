@@ -7,10 +7,15 @@ import com.github.codeplangui.settings.ApiKeyStore
 import com.github.codeplangui.settings.PluginSettings
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.VcsDataKeys
+import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ChangeListManager
+import com.intellij.openapi.vcs.changes.ChangesUtil
+import java.lang.reflect.Method
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
@@ -48,10 +53,10 @@ class GenerateCommitMessageAction : AnAction() {
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "生成 Commit Message...") {
             override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
                 val projectDir = project.basePath ?: return
-                val diff = readStagedDiff(projectDir)
+                val diff = buildSelectedDiff(e, project).ifBlank { readStagedDiff(projectDir) }
                 if (diff.isBlank()) {
-                    com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
-                        Messages.showInfoMessage(project, "没有 staged 的改动（请先 git add）", "CodePlanGUI")
+                    ApplicationManager.getApplication().invokeLater {
+                        Messages.showInfoMessage(project, "没有可用于生成 commit 的变更（请先勾选或 git add）", "CodePlanGUI")
                     }
                     return
                 }
@@ -71,8 +76,8 @@ class GenerateCommitMessageAction : AnAction() {
                     stream = false
                 )
 
-                val result = client.callSync(request)
-                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                val result = client.callCommitSync(request)
+                ApplicationManager.getApplication().invokeLater {
                     result.fold(
                         onSuccess = { generated ->
                             applyCommitMessage(e, project, generated.trim())
@@ -84,6 +89,55 @@ class GenerateCommitMessageAction : AnAction() {
                 }
             }
         })
+    }
+
+    private fun buildSelectedDiff(e: AnActionEvent, project: com.intellij.openapi.project.Project): String {
+        val changes = getSelectedChanges(e, project)
+        if (changes.isEmpty()) return ""
+
+        val files = changes.mapNotNull { change ->
+            try {
+                CommitPromptFile(
+                    path = ChangesUtil.getFilePath(change).path,
+                    changeType = change.type.name,
+                    beforeContent = change.beforeRevision?.content,
+                    afterContent = change.afterRevision?.content
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+        return CommitPromptBuilder.buildDiffPreview(files)
+    }
+
+    private fun getSelectedChanges(
+        e: AnActionEvent,
+        project: com.intellij.openapi.project.Project
+    ): Collection<Change> {
+        val workflowHandler = e.getData(VcsDataKeys.COMMIT_WORKFLOW_HANDLER)
+        val workflowChanges = workflowHandler?.let(::getIncludedChangesViaReflection)
+        if (!workflowChanges.isNullOrEmpty()) {
+            return workflowChanges
+        }
+
+        val directChanges = e.getData(VcsDataKeys.CHANGES)
+        if (!directChanges.isNullOrEmpty()) {
+            return directChanges.asList()
+        }
+
+        return ChangeListManager.getInstance(project).allChanges
+    }
+
+    private fun getIncludedChangesViaReflection(workflowHandler: Any): Collection<Change>? {
+        return try {
+            val getUiMethod: Method = workflowHandler.javaClass.getMethod("getUi")
+            val ui = getUiMethod.invoke(workflowHandler) ?: return null
+            val getIncludedChangesMethod: Method = ui.javaClass.getMethod("getIncludedChanges")
+            val result = getIncludedChangesMethod.invoke(ui) as? Collection<*> ?: return null
+            result.filterIsInstance<Change>()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun readStagedDiff(projectDir: String): String {

@@ -1,4 +1,6 @@
-:root {
+/* Default dark theme */
+:root,
+.theme-dark {
   color-scheme: dark;
   --bg: #0f1115;
   --bg-elevated: rgba(22, 24, 30, 0.86);
@@ -14,6 +16,55 @@
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
   --font-body: 'Avenir Next', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
   --font-mono: 'SFMono-Regular', 'JetBrains Mono', 'Menlo', monospace;
+  --input-bg: rgba(22, 24, 30, 0.92);
+  --input-border: rgba(232, 214, 190, 0.14);
+  --input-placeholder: rgba(188, 174, 154, 0.68);
+  --input-focus-border: rgba(240, 196, 136, 0.38);
+  --input-focus-ring: rgba(210, 161, 94, 0.09);
+  --gradient-bg: linear-gradient(180deg, #14171c 0%, #0f1115 100%);
+  --bar-bg: linear-gradient(180deg, rgba(23, 25, 31, 0.92), rgba(16, 18, 24, 0.88));
+  --input-area-bg: linear-gradient(180deg, rgba(16, 18, 24, 0.82), rgba(12, 14, 19, 0.94));
+  --assistant-bubble-bg: linear-gradient(180deg, rgba(29, 31, 38, 0.94), rgba(17, 19, 24, 0.92));
+  --pre-bg: rgba(7, 8, 11, 0.88);
+  --pre-border: rgba(240, 196, 136, 0.12);
+  --card-bg: linear-gradient(180deg, rgba(35, 28, 23, 0.54), rgba(16, 18, 24, 0.88));
+  --send-button-bg: linear-gradient(135deg, #b98346, #87552b);
+  --send-button-shadow: 0 10px 24px rgba(89, 47, 17, 0.28);
+  --send-button-disabled-bg: rgba(70, 72, 80, 0.65);
+  --send-button-disabled-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Light theme */
+.theme-light {
+  color-scheme: light;
+  --bg: #f5f5f5;
+  --bg-elevated: rgba(255, 255, 255, 0.9);
+  --panel: rgba(255, 255, 255, 0.85);
+  --panel-strong: rgba(245, 240, 230, 0.8);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(210, 161, 94, 0.35);
+  --text: #1a1a1a;
+  --muted: #666666;
+  --accent: #b98346;
+  --accent-strong: #87552b;
+  --danger: #d94e41;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  --input-bg: rgba(255, 255, 255, 0.95);
+  --input-border: rgba(135, 85, 43, 0.18);
+  --input-placeholder: rgba(102, 102, 102, 0.6);
+  --input-focus-border: rgba(135, 85, 43, 0.35);
+  --input-focus-ring: rgba(185, 131, 70, 0.14);
+  --gradient-bg: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
+  --bar-bg: linear-gradient(180deg, rgba(250, 250, 252, 0.97), rgba(242, 242, 246, 0.95));
+  --input-area-bg: linear-gradient(180deg, rgba(248, 248, 250, 0.95), rgba(240, 240, 244, 0.98));
+  --assistant-bubble-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 248, 250, 0.92));
+  --pre-bg: rgba(236, 236, 240, 0.9);
+  --pre-border: rgba(180, 130, 70, 0.15);
+  --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(242, 242, 246, 0.9));
+  --send-button-bg: linear-gradient(135deg, #d5ae77, #b98346);
+  --send-button-shadow: 0 10px 20px rgba(185, 131, 70, 0.18);
+  --send-button-disabled-bg: rgba(205, 205, 210, 0.88);
+  --send-button-disabled-border: rgba(120, 120, 128, 0.12);
 }
 
 * {
@@ -36,7 +87,7 @@ body {
   background:
     radial-gradient(circle at top left, rgba(210, 161, 94, 0.12), transparent 32%),
     radial-gradient(circle at bottom right, rgba(125, 72, 43, 0.14), transparent 30%),
-    linear-gradient(180deg, #14171c 0%, #0f1115 100%);
+    var(--gradient-bg);
 }
 
 body::before {
@@ -76,7 +127,7 @@ body::before {
   padding: 18px 18px 14px;
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(16px);
-  background: linear-gradient(180deg, rgba(23, 25, 31, 0.92), rgba(16, 18, 24, 0.88));
+  background: var(--bar-bg);
 }
 
 .provider-eyebrow,
@@ -100,6 +151,13 @@ body::before {
   display: block;
   margin-top: 6px;
   color: var(--muted) !important;
+}
+
+.provider-context {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent) !important;
+  font-size: 11px;
 }
 
 .provider-actions {
@@ -148,9 +206,7 @@ body::before {
   padding: 28px 24px;
   border-radius: 28px;
   border: 1px solid var(--border);
-  background:
-    linear-gradient(180deg, rgba(35, 28, 23, 0.54), rgba(16, 18, 24, 0.88)),
-    var(--bg-elevated);
+  background: var(--card-bg), var(--bg-elevated);
   box-shadow: var(--shadow);
 }
 
@@ -214,9 +270,7 @@ body::before {
 .message-bubble-assistant {
   width: 100%;
   padding: 14px 16px 16px;
-  background:
-    linear-gradient(180deg, rgba(29, 31, 38, 0.94), rgba(17, 19, 24, 0.92)),
-    var(--panel);
+  background: var(--assistant-bubble-bg), var(--panel);
 }
 
 .assistant-bubble-header {
@@ -263,8 +317,8 @@ body::before {
   padding: 14px 14px 16px;
   overflow-x: auto;
   border-radius: 18px;
-  border: 1px solid rgba(240, 196, 136, 0.12);
-  background: rgba(7, 8, 11, 0.88);
+  border: 1px solid var(--pre-border);
+  background: var(--pre-bg);
   position: relative;
 }
 
@@ -317,13 +371,13 @@ body::before {
   gap: 10px;
   padding: 14px 16px 18px;
   border-top: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(16, 18, 24, 0.82), rgba(12, 14, 19, 0.94));
+  background: var(--input-area-bg);
 }
 
 .input-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -335,6 +389,14 @@ body::before {
 
 .context-caption {
   font-size: 10px;
+}
+
+.context-file-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
 }
 
 .composer-row {
@@ -350,35 +412,37 @@ body::before {
   max-height: 120px;
   padding: 11px 13px;
   border-radius: 18px;
-  border: 1px solid rgba(232, 214, 190, 0.14);
-  background: rgba(22, 24, 30, 0.92);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
   color: var(--text);
   font: inherit;
   line-height: 1.6;
   outline: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  caret-color: var(--accent-strong);
+  cursor: text;
 }
 
 .composer-input:focus {
-  border-color: rgba(240, 196, 136, 0.38);
-  box-shadow: 0 0 0 4px rgba(210, 161, 94, 0.09);
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 4px var(--input-focus-ring);
 }
 
 .composer-input::placeholder {
-  color: rgba(188, 174, 154, 0.68);
+  color: var(--input-placeholder);
 }
 
 .send-button.ant-btn {
   height: 44px;
   border-radius: 16px;
   border: 1px solid rgba(240, 196, 136, 0.28);
-  background: linear-gradient(135deg, #b98346, #87552b) !important;
-  box-shadow: 0 10px 24px rgba(89, 47, 17, 0.28);
+  background: var(--send-button-bg) !important;
+  box-shadow: var(--send-button-shadow);
 }
 
 .send-button.ant-btn:disabled {
-  background: rgba(70, 72, 80, 0.65) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: var(--send-button-disabled-bg) !important;
+  border-color: var(--send-button-disabled-border) !important;
   box-shadow: none;
 }
 

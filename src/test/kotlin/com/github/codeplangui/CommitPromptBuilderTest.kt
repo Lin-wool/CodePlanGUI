@@ -1,6 +1,7 @@
 package com.github.codeplangui
 
 import com.github.codeplangui.action.CommitPromptBuilder
+import com.github.codeplangui.action.CommitPromptFile
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -40,5 +41,48 @@ class CommitPromptBuilderTest {
     fun `system prompt contains English when language is en`() {
         val prompt = CommitPromptBuilder.buildSystemPrompt("en")
         assertTrue(prompt.contains("English"))
+    }
+
+    @Test
+    fun `buildDiffPreview summarizes selected file changes`() {
+        val preview = CommitPromptBuilder.buildDiffPreview(
+            listOf(
+                CommitPromptFile(
+                    path = "src/App.kt",
+                    changeType = "MODIFICATION",
+                    beforeContent = "line 1\nold line\nline 3",
+                    afterContent = "line 1\nnew line\nline 3"
+                ),
+                CommitPromptFile(
+                    path = "README.md",
+                    changeType = "NEW",
+                    beforeContent = null,
+                    afterContent = "# Title\nbody"
+                )
+            )
+        )
+
+        assertTrue(preview.contains("=== MODIFICATION: src/App.kt ==="))
+        assertTrue(preview.contains("- old line"))
+        assertTrue(preview.contains("+ new line"))
+        assertTrue(preview.contains("=== NEW: README.md ==="))
+    }
+
+    @Test
+    fun `buildDiffPreview truncates oversized previews with marker`() {
+        val largeContent = (1..2000).joinToString("\n") { "line-$it" }
+        val files = (1..40).map { index ->
+            CommitPromptFile(
+                path = "src/LargeFile$index.kt",
+                changeType = "NEW",
+                beforeContent = null,
+                afterContent = largeContent
+            )
+        }
+
+        val preview = CommitPromptBuilder.buildDiffPreview(files)
+
+        assertTrue(preview.contains("[diff truncated]"))
+        assertFalse(preview.contains("src/LargeFile40.kt"))
     }
 }

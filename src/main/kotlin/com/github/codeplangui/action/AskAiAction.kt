@@ -1,6 +1,7 @@
 package com.github.codeplangui.action
 
 import com.github.codeplangui.ChatService
+import com.github.codeplangui.buildSelectionContextLabel
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -16,13 +17,19 @@ class AskAiAction : AnAction("Ask AI") {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val selection = e.getData(CommonDataKeys.EDITOR)?.selectionModel?.selectedText?.trim()
+        val editor = e.getData(CommonDataKeys.EDITOR)
+        val rawSelection = editor?.selectionModel?.selectedText
+        val selection = rawSelection?.trim()
         if (selection.isNullOrBlank()) {
             Messages.showInfoMessage(project, "请先选中一段代码或文本", "CodePlanGUI")
             return
         }
+        val contextLabel = buildSelectionContextLabel(
+            fileName = editor.virtualFile?.name,
+            lineCount = rawSelection.lines().size
+        )
 
         ToolWindowManager.getInstance(project).getToolWindow("CodePlanGUI")?.show(null)
-        ChatService.getInstance(project).askAboutSelection(selection)
+        ChatService.getInstance(project).askAboutSelection(selection, contextLabel)
     }
 }

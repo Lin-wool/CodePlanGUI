@@ -6,6 +6,9 @@ import com.github.codeplangui.model.Message
 import com.github.codeplangui.model.MessageRole
 import com.github.codeplangui.settings.ApiKeyStore
 import com.github.codeplangui.settings.PluginSettings
+import com.github.codeplangui.settings.PluginSettingsConfigurable
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -32,16 +35,34 @@ class ChatService(private val project: Project) : Disposable {
     var bridgeHandler: BridgeHandler? = null
         private set
 
+    private var contextFileCallback: ((String) -> Unit)? = null
+    private var onFrontendReadyCallback: (() -> Unit)? = null
+    private var isFrontendReady: Boolean = false
+
     fun attachBridge(handler: BridgeHandler) {
         bridgeHandler = handler
+        isFrontendReady = false
+    }
+
+    fun onFrontendReady() {
+        isFrontendReady = true
         publishStatus()
+        onFrontendReadyCallback?.invoke()
         pendingPrompt?.let { prompt ->
             pendingPrompt = null
-            sendMessage(prompt.text, prompt.includeContext)
+            sendMessage(prompt.text, prompt.includeContext, prompt.contextLabel)
         }
     }
 
-    fun sendMessage(text: String, includeContext: Boolean) {
+    fun setContextFileCallback(callback: (String) -> Unit) {
+        contextFileCallback = callback
+    }
+
+    fun setOnFrontendReadyCallback(callback: () -> Unit) {
+        onFrontendReadyCallback = callback
+    }
+
+    fun sendMessage(text: String, includeContext: Boolean, contextLabelOverride: String? = null) {
         activeStream?.cancel()
         activeStream = null
         activeMessageId = null
@@ -57,11 +78,20 @@ class ChatService(private val project: Project) : Disposable {
         val apiKey = ApiKeyStore.load(provider.id) ?: ""
         if (apiKey.isBlank()) {
             publishStatus()
-            bridgeHandler?.notifyError("API Key 未设置，请在设置中重新配置")
+            bridgeHandler?.notifyError("API Key 未设置或未保存，请在 Settings 中重新配置并点 Apply/OK")
             return
         }
 
-        val systemContent = buildSystemContent(includeContext && settings.getState().contextInjectionEnabled)
+        val contextSnapshot = if (includeContext && settings.getState().contextInjectionEnabled) {
+            capturePromptContextSnapshot()
+        } else {
+            null
+        }
+        contextFileCallback?.invoke(resolveUiContextLabel(contextLabelOverride, contextSnapshot))
+        val systemContent = formatSystemContent(
+            base = buildBaseSystemPrompt(),
+            snapshot = contextSnapshot
+        )
         session.setSystemMessage(systemContent)
         session.add(Message(MessageRole.USER, text))
 
@@ -120,52 +150,52 @@ class ChatService(private val project: Project) : Disposable {
         activeStream = null
         activeMessageId = null
         session.clear()
+        contextFileCallback?.invoke("")
         publishStatus()
     }
 
-    fun askAboutSelection(selection: String) {
+    fun askAboutSelection(selection: String, contextLabel: String) {
         val prompt = buildSelectionPrompt(selection)
-        if (bridgeHandler?.isReady == true) {
-            sendMessage(prompt, false)
+        if (bridgeHandler?.isReady == true && isFrontendReady) {
+            sendMessage(prompt, false, contextLabel)
         } else {
-            pendingPrompt = PendingPrompt(prompt, false)
+            pendingPrompt = PendingPrompt(prompt, false, contextLabel)
         }
     }
 
     fun openSettings() {
-        ShowSettingsUtil.getInstance().showSettingsDialog(project, "CodePlanGUI")
+        openSettingsOnEdt(
+            openDialog = {
+                ShowSettingsUtil.getInstance().showSettingsDialog(project, PluginSettingsConfigurable::class.java)
+            },
+            enqueue = { action ->
+                ApplicationManager.getApplication().invokeLater {
+                    action()
+                }
+            }
+        )
     }
 
     fun refreshBridgeStatus() {
         publishStatus()
     }
 
-    private fun buildSystemContent(includeContext: Boolean): String {
-        val base = "你是一个代码助手。请简洁准确地回答用户问题。"
-        if (!includeContext) return base
-
-        val editor = try {
-            FileEditorManager.getInstance(project).selectedTextEditor
+    private fun capturePromptContextSnapshot(): PromptContextSnapshot? {
+        return try {
+            ReadAction.compute<PromptContextSnapshot?, RuntimeException> {
+                val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return@compute null
+                val file = editor.virtualFile ?: return@compute null
+                buildPromptContextSnapshot(
+                    fileName = file.name,
+                    extension = file.extension,
+                    selectedText = editor.selectionModel.selectedText,
+                    documentText = editor.document.text,
+                    maxLines = PluginSettings.getInstance().getState().contextMaxLines
+                )
+            }
         } catch (_: Exception) {
             null
-        } ?: return base
-
-        val file = editor.virtualFile ?: return base
-        val selected = editor.selectionModel.selectedText
-        val content = selected ?: editor.document.text
-
-        val lines = content.lines()
-            .take(PluginSettings.getInstance().getState().contextMaxLines)
-            .joinToString("\n")
-            .take(12000)
-
-        val ext = file.extension ?: "txt"
-        return """$base
-
-当前文件：${file.name}
-```$ext
-$lines
-```"""
+        }
     }
 
     private fun buildSelectionPrompt(selection: String): String = """
@@ -200,7 +230,85 @@ $selection
         fun getInstance(project: Project): ChatService = project.getService(ChatService::class.java)
     }
 
-    private data class PendingPrompt(val text: String, val includeContext: Boolean)
+    private data class PendingPrompt(
+        val text: String,
+        val includeContext: Boolean,
+        val contextLabel: String? = null
+    )
+}
+
+internal data class PromptContextSnapshot(
+    val fileName: String,
+    val extension: String,
+    val content: String,
+    val contextLabel: String
+)
+
+internal fun buildPromptContextSnapshot(
+    fileName: String,
+    extension: String?,
+    selectedText: String?,
+    documentText: String,
+    maxLines: Int
+): PromptContextSnapshot {
+    val preferredContent = selectedText?.takeIf { it.isNotBlank() } ?: documentText
+    val content = preferredContent
+        .lines()
+        .take(maxLines)
+        .joinToString("\n")
+        .take(12000)
+    val contextLabel = if (selectedText.isNullOrBlank()) {
+        "$fileName · 当前文件"
+    } else {
+        buildSelectionContextLabel(fileName, selectedText.lines().size)
+    }
+
+    return PromptContextSnapshot(
+        fileName = fileName,
+        extension = extension ?: "txt",
+        content = content,
+        contextLabel = contextLabel
+    )
+}
+
+internal fun buildSelectionContextLabel(fileName: String?, lineCount: Int): String {
+    val lineText = "选中 ${lineCount.coerceAtLeast(1)} 行"
+    return if (fileName.isNullOrBlank()) lineText else "$fileName · $lineText"
+}
+
+internal fun buildBaseSystemPrompt(): String = """
+你是一个代码助手。请简洁准确地回答用户问题。
+你当前没有终端、文件系统或工具调用能力。
+不要声称你已经执行命令、读取文件、修改代码或查看了运行结果。
+如果用户要求你直接运行命令或检查本地文件，请明确说明当前插件暂不支持该能力，并要求用户粘贴结果或手动提供内容。
+""".trimIndent()
+
+internal fun resolveUiContextLabel(
+    contextLabelOverride: String?,
+    snapshot: PromptContextSnapshot?
+): String = contextLabelOverride ?: snapshot?.contextLabel.orEmpty()
+
+internal fun openSettingsOnEdt(
+    openDialog: () -> Unit,
+    enqueue: ((() -> Unit) -> Unit)
+) {
+    enqueue(openDialog)
+}
+
+internal fun formatSystemContent(
+    base: String,
+    snapshot: PromptContextSnapshot?
+): String {
+    if (snapshot == null) {
+        return base
+    }
+
+    return """$base
+
+当前文件：${snapshot.fileName}
+```${snapshot.extension}
+${snapshot.content}
+```"""
 }
 
 internal fun deriveConnectionState(

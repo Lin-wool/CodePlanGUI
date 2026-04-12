@@ -80,6 +80,25 @@ class OkHttpSseClientTest {
     }
 
     @Test
+    fun `callCommitSync uses extended timeout budget`() {
+        var observedReadTimeout = -1
+        val client = OkHttpSseClient(
+            commitClient = OkHttpClient.Builder()
+                .readTimeout(45, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    observedReadTimeout = chain.readTimeoutMillis()
+                    responseFor(chain.request(), 200, """{"choices":[{"message":{"content":"commit msg"}}]}""")
+                }
+                .build()
+        )
+
+        val result = client.callCommitSync(simpleRequest())
+
+        assertEquals("commit msg", result.getOrThrow())
+        assertEquals(45_000, observedReadTimeout)
+    }
+
+    @Test
     fun `callSync falls back to raw body when schema is unexpected`() {
         val rawBody = """{"unexpected":true}"""
         val client = OkHttpSseClient(

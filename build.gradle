@@ -30,6 +30,7 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaCommunity(ideaVersion)
+        jetbrainsRuntime()
         instrumentationTools()
         pluginVerifier()
         bundledPlugin('Git4Idea')

@@ -8,3 +8,4 @@ webview/dist/
 *.class
 .DS_Store
 local.properties
+/node-compile-cache/

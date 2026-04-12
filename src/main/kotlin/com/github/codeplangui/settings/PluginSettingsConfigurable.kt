@@ -3,6 +3,8 @@ package com.github.codeplangui.settings
 import com.github.codeplangui.ChatService
 import com.github.codeplangui.api.OkHttpSseClient
 import com.github.codeplangui.api.TestResult
+import com.intellij.ide.SaveAndSyncHandler
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
@@ -125,7 +127,11 @@ class PluginSettingsConfigurable : Configurable {
             .setEditAction {
                 val row = table.selectedRow
                 if (row < 0) return@setEditAction
-                val dialog = ProviderDialog(tableModel.providers[row])
+                val existing = tableModel.providers[row]
+                val dialog = ProviderDialog(
+                    existing = existing,
+                    initialApiKey = effectiveApiKey(existing.id)
+                )
                 if (dialog.showAndGet()) {
                     val config = dialog.getConfig()
                     tableModel.providers[row] = config
@@ -226,6 +232,7 @@ class PluginSettingsConfigurable : Configurable {
             }
         }
         pendingApiKeyUpdates.clear()
+        SaveAndSyncHandler.getInstance().saveSettingsUnderModalProgress(ApplicationManager.getApplication())
         ProjectManager.getInstance().openProjects
             .filterNot { it.isDisposed }
             .forEach { project ->
@@ -277,8 +284,7 @@ class PluginSettingsConfigurable : Configurable {
     }
 
     private fun effectiveApiKey(providerId: String): String? =
-        if (pendingApiKeyUpdates.containsKey(providerId)) pendingApiKeyUpdates[providerId]
-        else ApiKeyStore.load(providerId)
+        resolveInitialApiKeyValue(providerId, pendingApiKeyUpdates, ApiKeyStore.load(providerId))
 
     private data class ProviderChoice(val id: String, val label: String)
 

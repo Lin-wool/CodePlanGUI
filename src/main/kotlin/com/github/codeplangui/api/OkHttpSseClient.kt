@@ -43,6 +43,10 @@ class OkHttpSseClient(
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build(),
+    private val commitClient: OkHttpClient = syncClient.newBuilder()
+        .readTimeout(45, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .build(),
     private val testClient: OkHttpClient = syncClient.newBuilder()
         .readTimeout(5, TimeUnit.SECONDS)
         .callTimeout(5, TimeUnit.SECONDS)
@@ -102,10 +106,22 @@ class OkHttpSseClient(
     }
 
     fun callSync(request: Request): Result<String> {
+        return callWithClient(syncClient, request, "请求超时，请检查网络")
+    }
+
+    fun callCommitSync(request: Request): Result<String> {
+        return callWithClient(commitClient, request, "请求超时，请检查网络或缩小本次提交范围")
+    }
+
+    private fun callWithClient(
+        client: OkHttpClient,
+        request: Request,
+        timeoutMessage: String
+    ): Result<String> {
         return try {
-            syncClient.newCall(request).execute().use { response ->
+            client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Result.failure(Exception(buildErrorMessage(response, null)))
+                    Result.failure(Exception(buildErrorMessage(response, null, timeoutMessage)))
                 } else {
                     val body = response.body?.string() ?: ""
                     val content = extractSyncContent(body)
@@ -113,7 +129,7 @@ class OkHttpSseClient(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(buildErrorMessage(null, e, timeoutMessage), e))
         }
     }
 
@@ -134,7 +150,11 @@ class OkHttpSseClient(
         }
     }
 
-    private fun buildErrorMessage(response: Response?, t: Throwable?): String = when {
+    private fun buildErrorMessage(
+        response: Response?,
+        t: Throwable?,
+        timeoutMessage: String = "请求超时，请检查网络"
+    ): String = when {
         response != null -> when (response.code) {
             401 -> "HTTP 401：API Key 无效或已过期"
             403 -> "HTTP 403：访问被拒绝，请检查 endpoint 和 Key"
@@ -144,7 +164,7 @@ class OkHttpSseClient(
             in 500..599 -> "HTTP ${response.code}：服务端错误"
             else -> "HTTP ${response.code}: ${response.body?.string()?.take(200)}"
         }
-        t is java.net.SocketTimeoutException -> "请求超时（60s），请检查网络"
+        t is java.net.SocketTimeoutException -> timeoutMessage
         t is java.net.ConnectException -> "无法连接 endpoint，请检查 URL 和网络"
         t != null -> t.message ?: "未知网络错误"
         else -> "未知错误"

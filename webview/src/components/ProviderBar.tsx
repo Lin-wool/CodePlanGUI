@@ -1,5 +1,6 @@
-import { PlusOutlined, SettingOutlined } from '@ant-design/icons'
+import { PlusOutlined, SettingOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Button, Typography } from 'antd'
+import { getConnectionStateLabel } from '../composerState'
 import { BridgeStatus } from '../types/bridge'
 
 interface Props {
@@ -9,13 +10,6 @@ interface Props {
   bridgeReady: boolean
 }
 
-const statusLabel: Record<BridgeStatus['connectionState'], string> = {
-  unconfigured: 'unconfigured',
-  ready: 'ready',
-  streaming: 'streaming',
-  error: 'error',
-}
-
 export function ProviderBar({ onNewChat, onOpenSettings, status, bridgeReady }: Props) {
   const title = status.providerName || 'CodePlanGUI'
   const detail = status.model || (bridgeReady ? 'Select a provider in Settings' : 'Connecting bridge')
@@ -23,13 +17,17 @@ export function ProviderBar({ onNewChat, onOpenSettings, status, bridgeReady }: 
   return (
     <div className="provider-bar">
       <div>
-        <Typography.Text className="provider-eyebrow">CodePlanGUI</Typography.Text>
         <Typography.Title level={5} className="provider-title">
           {title}
         </Typography.Title>
         <Typography.Text className="provider-meta">
-          {detail} · {statusLabel[status.connectionState]}
+          {detail} · {getConnectionStateLabel(status.connectionState)}
         </Typography.Text>
+        {status.contextFile && (
+          <Typography.Text className="provider-context" title={status.contextFile}>
+            <FileTextOutlined /> {status.contextFile}
+          </Typography.Text>
+        )}
       </div>
       <div className="provider-actions">
         <Button

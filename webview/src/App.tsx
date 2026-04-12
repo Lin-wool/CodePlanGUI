@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SendOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Switch, Tooltip, Typography } from 'antd'
+import { Button, ConfigProvider, Switch, Tooltip, Typography, theme as antdTheme } from 'antd'
 import { v4 as uuidv4 } from 'uuid'
 import { ErrorBanner } from './components/ErrorBanner'
 import { Message, MessageBubble } from './components/MessageBubble'
 import { ProviderBar } from './components/ProviderBar'
+import { getComposerReadiness } from './composerState'
+import { getContextToggleMeta } from './contextState'
 import { useBridge } from './hooks/useBridge'
 import { prepareSendPayload } from './sendState'
+import { applyBridgeStatus, applyContextFile } from './statusState'
 import { BridgeStatus } from './types/bridge'
 import './App.css'
 
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
+  const isComposingRef = useRef(false)
   const [isLoading, setIsLoading] = useState(false)
   const [includeContext, setIncludeContext] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,8 +24,16 @@ export default function App() {
     providerName: '',
     model: '',
     connectionState: 'unconfigured',
+    contextFile: '',
   })
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Apply theme class to document root
+  useEffect(() => {
+    document.documentElement.classList.remove('theme-dark', 'theme-light')
+    document.documentElement.classList.add(`theme-${themeMode}`)
+  }, [themeMode])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -63,20 +75,50 @@ export default function App() {
     setError(message)
   }, [])
 
-  const bridgeReady = useBridge({ onStart, onToken, onEnd, onError, onStatus: setStatus })
+  const onContextFile = useCallback((fileName: string) => {
+    setStatus(prev => applyContextFile(prev, fileName))
+  }, [])
+
+  const onTheme = useCallback((newTheme: 'dark' | 'light') => {
+    setThemeMode(newTheme)
+  }, [])
+
+  const onStatus = useCallback((nextStatus: BridgeStatus) => {
+    setStatus(prev => applyBridgeStatus(prev, nextStatus))
+  }, [])
+
+  // Build theme algorithm for Ant Design
+  const themeAlgorithm = themeMode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm
+
+  const bridgeReady = useBridge({ onStart, onToken, onEnd, onError, onStatus, onContextFile, onTheme })
+  const composerReadiness = getComposerReadiness({
+    inputText,
+    isLoading,
+    isBridgeReady: bridgeReady,
+    connectionState: status.connectionState,
+  })
+  const contextToggleMeta = getContextToggleMeta(includeContext, status.contextFile || '')
 
   const handleSend = () => {
-    const payload = prepareSendPayload(inputText, isLoading, bridgeReady)
+    if (!composerReadiness.canSend) {
+      if (composerReadiness.reason && composerReadiness.text) {
+        setError(composerReadiness.reason)
+      }
+      return
+    }
+
+    const payload = prepareSendPayload(composerReadiness.text, isLoading, bridgeReady)
     if (!payload) return
 
     const userMsgId = uuidv4()
     setMessages((prev) => [...prev, { id: userMsgId, role: 'user', content: payload.text }])
     setInputText('')
+    console.log('[CodePlanGUI] handleSend:', payload.text, 'includeContext:', includeContext)
     window.__bridge?.sendMessage(payload.text, includeContext)
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !isComposingRef.current) {
       event.preventDefault()
       handleSend()
     }
@@ -97,14 +139,13 @@ export default function App() {
   return (
     <ConfigProvider
       theme={{
+        algorithm: themeAlgorithm,
         token: {
           colorPrimary: '#d2a15e',
           colorInfo: '#d2a15e',
-          colorTextBase: '#f2eadf',
-          colorBgBase: '#0f1115',
           borderRadius: 16,
           fontFamily:
-            "'Avenir Next', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif",
+            "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif",
         },
       }}
     >
@@ -150,20 +191,13 @@ export default function App() {
         <div className="input-area">
           <div className="input-meta">
             <div className="context-toggle">
-              <Tooltip title={includeContext ? '已附加当前文件上下文' : '不附加文件上下文'}>
+              <Tooltip title={contextToggleMeta.title}>
                 <Switch size="small" checked={includeContext} onChange={setIncludeContext} />
               </Tooltip>
-              <span className="context-caption">
-                {includeContext ? 'context on' : 'context off'}
+              <span className="context-caption context-file-label" title={contextToggleMeta.title}>
+                {contextToggleMeta.label}
               </span>
             </div>
-            <span className="context-caption">
-              {!bridgeReady
-                ? 'bridge connecting...'
-                : isLoading
-                  ? 'streaming response...'
-                  : status.connectionState}
-            </span>
           </div>
 
           <div className="composer-row">
@@ -172,6 +206,11 @@ export default function App() {
               onChange={(event) => {
                 setInputText(event.target.value)
                 adjustTextareaHeight(event.target)
+              }}
+              onCompositionStart={() => { isComposingRef.current = true }}
+              onCompositionEnd={(event) => {
+                isComposingRef.current = false
+                setInputText((event.target as HTMLTextAreaElement).value)
               }}
               onKeyDown={handleKeyDown}
               placeholder="输入问题... (Enter 发送，Shift+Enter 换行)"
@@ -183,7 +222,8 @@ export default function App() {
               type="primary"
               icon={<SendOutlined />}
               onClick={handleSend}
-              disabled={!prepareSendPayload(inputText, isLoading, bridgeReady)}
+              disabled={!composerReadiness.canSend}
+              title={composerReadiness.reason ?? 'Send'}
               size="small"
               className="send-button"
             />

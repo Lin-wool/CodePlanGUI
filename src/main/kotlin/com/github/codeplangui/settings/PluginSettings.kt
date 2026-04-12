@@ -9,7 +9,7 @@ import java.util.UUID
 
 @Serializable
 data class ProviderConfig(
-    val id: String = UUID.randomUUID().toString(),
+    var id: String = UUID.randomUUID().toString(),
     var name: String = "",
     var endpoint: String = "",
     var model: String = ""
@@ -38,7 +38,20 @@ class PluginSettings : PersistentStateComponent<SettingsState> {
     override fun getState(): SettingsState = state
 
     override fun loadState(state: SettingsState) {
-        this.state = SettingsFormState.fromSettingsState(state).toSettingsState()
+        val migratedProviders = recoverLegacyProviderIds(
+            providers = state.providers.toMutableList(),
+            activeProviderId = state.activeProviderId,
+            hasApiKey = { providerId ->
+                try {
+                    !ApiKeyStore.load(providerId).isNullOrBlank()
+                } catch (_: Exception) {
+                    false
+                }
+            }
+        )
+        this.state = SettingsFormState.fromSettingsState(
+            state.copy(providers = migratedProviders)
+        ).toSettingsState()
     }
 
     fun getActiveProvider(): ProviderConfig? =
@@ -50,4 +63,22 @@ class PluginSettings : PersistentStateComponent<SettingsState> {
                 .getApplication()
                 .getService(PluginSettings::class.java)
     }
+}
+
+internal fun recoverLegacyProviderIds(
+    providers: MutableList<ProviderConfig>,
+    activeProviderId: String?,
+    hasApiKey: (String) -> Boolean
+): MutableList<ProviderConfig> {
+    if (providers.size != 1 || activeProviderId.isNullOrBlank()) {
+        return providers
+    }
+
+    val provider = providers.single()
+    if (provider.id == activeProviderId || hasApiKey(provider.id) || !hasApiKey(activeProviderId)) {
+        return providers
+    }
+
+    provider.id = activeProviderId
+    return providers
 }

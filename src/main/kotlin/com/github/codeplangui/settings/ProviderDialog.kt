@@ -8,17 +8,20 @@ import com.intellij.util.ui.FormBuilder
 import javax.swing.JComponent
 
 class ProviderDialog(
-    private val existing: ProviderConfig? = null
+    private val existing: ProviderConfig? = null,
+    initialApiKey: String? = null
 ) : DialogWrapper(true) {
 
     private val nameField = JBTextField(existing?.name ?: "")
     private val endpointField = JBTextField(existing?.endpoint ?: "")
     private val keyField = JBPasswordField().apply {
-        if (existing != null) {
-            val loaded = ApiKeyStore.load(existing.id)
-            if (!loaded.isNullOrBlank()) {
-                text = loaded
-            }
+        val loaded = when {
+            initialApiKey != null -> initialApiKey
+            existing != null -> ApiKeyStore.load(existing.id)
+            else -> null
+        }
+        if (!loaded.isNullOrBlank()) {
+            text = loaded
         }
     }
     private val modelField = JBTextField(existing?.model ?: "")
@@ -66,4 +69,14 @@ class ProviderDialog(
         internal fun normalizeApiKeyInput(rawInput: String): String? =
             rawInput.trim().ifBlank { null }
     }
+}
+
+internal fun resolveInitialApiKeyValue(
+    providerId: String,
+    pendingApiKeyUpdates: Map<String, String?>,
+    persistedApiKey: String?
+): String? = if (pendingApiKeyUpdates.containsKey(providerId)) {
+    pendingApiKeyUpdates[providerId]
+} else {
+    persistedApiKey
 }
