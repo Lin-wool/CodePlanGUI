@@ -6,6 +6,8 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
 import { Marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
+import type { ExecutionCardData } from './ExecutionCard'
+import { ExecutionCard } from './ExecutionCard'
 
 const marked = new Marked(
   markedHighlight({
@@ -19,9 +21,10 @@ const marked = new Marked(
 
 export interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'execution'
   content: string
   isStreaming?: boolean
+  execution?: ExecutionCardData
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -72,6 +75,14 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
+  if (message.role === 'execution' && message.execution) {
+    return (
+      <div className="message-row message-row-assistant">
+        <ExecutionCard data={message.execution} />
+      </div>
+    )
+  }
+
   const isUser = message.role === 'user'
   const htmlRef = useRef<HTMLDivElement>(null)
 

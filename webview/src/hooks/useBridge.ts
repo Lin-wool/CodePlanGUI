@@ -9,6 +9,8 @@ interface BridgeCallbacks {
   onStatus: (status: BridgeStatus) => void
   onContextFile: (fileName: string) => void
   onTheme: (theme: 'dark' | 'light') => void
+  onApprovalRequest: (requestId: string, command: string, description: string) => void
+  onExecutionStatus: (requestId: string, status: string, result: string) => void
 }
 
 export function useBridge(callbacks: BridgeCallbacks) {
@@ -29,6 +31,8 @@ export function useBridge(callbacks: BridgeCallbacks) {
     window.__bridge.onStatus = callbacks.onStatus
     window.__bridge.onContextFile = callbacks.onContextFile
     window.__bridge.onTheme = callbacks.onTheme
+    window.__bridge.onApprovalRequest = callbacks.onApprovalRequest
+    window.__bridge.onExecutionStatus = callbacks.onExecutionStatus
   }, [callbacks])
 
   useEffect(() => {
@@ -48,6 +52,9 @@ export function useBridge(callbacks: BridgeCallbacks) {
           onStatus: currentCallbacks.onStatus,
           onContextFile: currentCallbacks.onContextFile,
           onTheme: currentCallbacks.onTheme,
+          approvalResponse: () => {},
+          onApprovalRequest: currentCallbacks.onApprovalRequest,
+          onExecutionStatus: currentCallbacks.onExecutionStatus,
         }
       } else {
         window.__bridge.onStart = currentCallbacks.onStart
@@ -57,6 +64,8 @@ export function useBridge(callbacks: BridgeCallbacks) {
         window.__bridge.onStatus = currentCallbacks.onStatus
         window.__bridge.onContextFile = currentCallbacks.onContextFile
         window.__bridge.onTheme = currentCallbacks.onTheme
+        window.__bridge.onApprovalRequest = currentCallbacks.onApprovalRequest
+        window.__bridge.onExecutionStatus = currentCallbacks.onExecutionStatus
       }
 
       const isReady = window.__bridge.isReady === true

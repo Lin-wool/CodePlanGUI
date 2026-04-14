@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SendOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Switch, Tooltip, Typography, theme as antdTheme } from 'antd'
 import { v4 as uuidv4 } from 'uuid'
+import { ApprovalDialog } from './components/ApprovalDialog'
 import { ErrorBanner } from './components/ErrorBanner'
 import { Message, MessageBubble } from './components/MessageBubble'
 import { ProviderBar } from './components/ProviderBar'
+import type { ExecutionCardData, ExecutionStatus } from './components/ExecutionCard'
 import { getComposerReadiness } from './composerState'
 import { getContextToggleMeta } from './contextState'
 import { useBridge } from './hooks/useBridge'
@@ -28,6 +30,10 @@ export default function App() {
   })
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [approvalOpen, setApprovalOpen] = useState(false)
+  const [approvalRequestId, setApprovalRequestId] = useState('')
+  const [approvalCommand, setApprovalCommand] = useState('')
+  const [approvalDescription, setApprovalDescription] = useState('')
 
   // Apply theme class to document root
   useEffect(() => {
@@ -87,10 +93,49 @@ export default function App() {
     setStatus(prev => applyBridgeStatus(prev, nextStatus))
   }, [])
 
+  const onApprovalRequest = useCallback((requestId: string, command: string, description: string) => {
+    setApprovalRequestId(requestId)
+    setApprovalCommand(command)
+    setApprovalDescription(description)
+    setApprovalOpen(true)
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: requestId,
+        role: 'execution' as const,
+        content: '',
+        execution: { requestId, command, status: 'waiting' as ExecutionStatus },
+      },
+    ])
+  }, [])
+
+  const onExecutionStatus = useCallback((requestId: string, status: string, resultJson: string) => {
+    const result = (() => {
+      try { return JSON.parse(resultJson) } catch { return undefined }
+    })()
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === requestId
+          ? { ...msg, execution: { ...msg.execution!, status: status as ExecutionStatus, result } }
+          : msg
+      )
+    )
+  }, [])
+
+  const handleApprovalAllow = useCallback(() => {
+    setApprovalOpen(false)
+    window.__bridge?.approvalResponse(approvalRequestId, 'allow')
+  }, [approvalRequestId])
+
+  const handleApprovalDeny = useCallback(() => {
+    setApprovalOpen(false)
+    window.__bridge?.approvalResponse(approvalRequestId, 'deny')
+  }, [approvalRequestId])
+
   // Build theme algorithm for Ant Design
   const themeAlgorithm = themeMode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm
 
-  const bridgeReady = useBridge({ onStart, onToken, onEnd, onError, onStatus, onContextFile, onTheme })
+  const bridgeReady = useBridge({ onStart, onToken, onEnd, onError, onStatus, onContextFile, onTheme, onApprovalRequest, onExecutionStatus })
   const composerReadiness = getComposerReadiness({
     inputText,
     isLoading,
@@ -150,6 +195,13 @@ export default function App() {
       }}
     >
       <div className="app-shell">
+        <ApprovalDialog
+          open={approvalOpen}
+          command={approvalCommand}
+          description={approvalDescription}
+          onAllow={handleApprovalAllow}
+          onDeny={handleApprovalDeny}
+        />
         <ProviderBar
           onNewChat={handleNewChat}
           onOpenSettings={() => window.__bridge?.openSettings()}

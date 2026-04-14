@@ -5,6 +5,17 @@ export interface BridgeStatus {
   contextFile?: string
 }
 
+export interface ExecutionResult {
+  status: 'ok' | 'error' | 'blocked' | 'denied' | 'timeout'
+  exit_code?: number
+  stdout?: string
+  stderr?: string
+  duration_ms?: number
+  truncated?: boolean
+  reason?: string
+  timeout_seconds?: number
+}
+
 export interface Bridge {
   isReady: boolean
   sendMessage: (text: string, includeContext: boolean) => void
@@ -18,6 +29,9 @@ export interface Bridge {
   onStatus: (status: BridgeStatus) => void
   onContextFile: (fileName: string) => void
   onTheme: (theme: 'dark' | 'light') => void
+  approvalResponse: (requestId: string, decision: 'allow' | 'deny') => void
+  onApprovalRequest: (requestId: string, command: string, description: string) => void
+  onExecutionStatus: (requestId: string, status: string, result: string) => void
 }
 
 declare global {
