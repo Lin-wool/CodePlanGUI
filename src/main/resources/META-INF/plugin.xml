@@ -12,6 +12,9 @@
         <applicationService
             serviceImplementation="com.github.codeplangui.settings.PluginSettings"/>
 
+        <projectService
+            serviceImplementation="com.github.codeplangui.execution.CommandExecutionService"/>
+
         <toolWindow id="CodePlanGUI"
                     anchor="right"
                     factoryClass="com.github.codeplangui.ChatToolWindowFactory"
