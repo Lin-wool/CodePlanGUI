@@ -22,6 +22,7 @@ import java.awt.Dimension
 import javax.swing.ButtonGroup
 import javax.swing.DefaultComboBoxModel
 import javax.swing.DefaultListCellRenderer
+import javax.swing.DefaultListModel
 import javax.swing.JButton
 import javax.swing.JCheckBox
 import javax.swing.JComboBox
@@ -30,6 +31,7 @@ import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.JRadioButton
 import javax.swing.JSpinner
+import javax.swing.JScrollPane
 import javax.swing.SpinnerNumberModel
 import javax.swing.JTable
 import javax.swing.ListSelectionModel
@@ -48,6 +50,10 @@ class PluginSettingsConfigurable : Configurable {
     private lateinit var commitLanguageEn: JRadioButton
     private lateinit var commitFormatConventional: JRadioButton
     private lateinit var commitFormatFreeform: JRadioButton
+    private lateinit var commandExecutionCheckbox: JCheckBox
+    private lateinit var commandTimeoutSpinner: JSpinner
+    private lateinit var commandWhitelistModel: DefaultListModel<String>
+    private lateinit var commandWhitelistList: JList<String>
     private val client = OkHttpSseClient()
     private val pendingApiKeyUpdates = linkedMapOf<String, String?>()
 
@@ -202,9 +208,56 @@ class PluginSettingsConfigurable : Configurable {
             )
             .panel
 
+        val execSettings = SettingsFormState.fromSettingsState(PluginSettings.getInstance().getState())
+
+        commandExecutionCheckbox = JCheckBox("Enable AI command execution", execSettings.commandExecutionEnabled)
+        commandTimeoutSpinner = JSpinner(SpinnerNumberModel(execSettings.commandTimeoutSeconds, 5, 300, 5))
+        commandWhitelistModel = DefaultListModel<String>().also { model ->
+            execSettings.commandWhitelist.forEach { model.addElement(it) }
+        }
+        commandWhitelistList = JList(commandWhitelistModel).apply {
+            selectionMode = ListSelectionModel.SINGLE_SELECTION
+            visibleRowCount = 6
+        }
+
+        val whitelistPanel = JPanel(BorderLayout()).apply {
+            add(JScrollPane(commandWhitelistList), BorderLayout.CENTER)
+            val btnPanel = JPanel()
+            val addBtn = JButton("+ Add").apply {
+                addActionListener {
+                    val cmd = Messages.showInputDialog(
+                        "Command name (e.g. cargo):", "Add Command", null
+                    ) ?: return@addActionListener
+                    if (cmd.isNotBlank() && !commandWhitelistModel.contains(cmd.trim())) {
+                        commandWhitelistModel.addElement(cmd.trim())
+                    }
+                }
+            }
+            val removeBtn = JButton("Remove").apply {
+                addActionListener {
+                    val idx = commandWhitelistList.selectedIndex
+                    if (idx >= 0) commandWhitelistModel.remove(idx)
+                }
+            }
+            btnPanel.add(addBtn)
+            btnPanel.add(removeBtn)
+            add(btnPanel, BorderLayout.SOUTH)
+        }
+
+        val executionPanel = FormBuilder.createFormBuilder()
+            .addComponent(commandExecutionCheckbox)
+            .addLabeledComponent("Execution timeout (s):", commandTimeoutSpinner)
+            .addLabeledComponent(JBLabel("Allowed commands:"), whitelistPanel)
+            .addComponent(
+                JBLabel("<html><small>&#x26A0; AI still requires your approval before each command runs.<br>" +
+                        "Commands not in this list are blocked without prompting.</small></html>")
+            )
+            .panel
+
         val tabs = JBTabbedPane().apply {
             addTab("Providers", providersPanel)
             addTab("Chat / Commit", chatCommitPanel)
+            addTab("Execution", executionPanel)
         }
 
         panel = JPanel(BorderLayout()).apply {
@@ -253,6 +306,11 @@ class PluginSettingsConfigurable : Configurable {
         commitLanguageEn.isSelected = settings.commitLanguage == "en"
         commitFormatConventional.isSelected = settings.commitFormat == "conventional"
         commitFormatFreeform.isSelected = settings.commitFormat == "freeform"
+        val execState = SettingsFormState.fromSettingsState(PluginSettings.getInstance().getState())
+        commandExecutionCheckbox.isSelected = execState.commandExecutionEnabled
+        commandTimeoutSpinner.value = execState.commandTimeoutSeconds
+        commandWhitelistModel.clear()
+        execState.commandWhitelist.forEach { commandWhitelistModel.addElement(it) }
         pendingApiKeyUpdates.clear()
     }
 
@@ -268,7 +326,12 @@ class PluginSettingsConfigurable : Configurable {
         commitLanguage = if (commitLanguageEn.isSelected) "en" else "zh",
         commitFormat = if (commitFormatFreeform.isSelected) "freeform" else "conventional",
         contextInjectionEnabled = contextInjectionCheckbox.isSelected,
-        contextMaxLines = (contextMaxLinesSpinner.value as Number).toInt()
+        contextMaxLines = (contextMaxLinesSpinner.value as Number).toInt(),
+        commandExecutionEnabled = commandExecutionCheckbox.isSelected,
+        commandWhitelist = (0 until commandWhitelistModel.size()).map {
+            commandWhitelistModel.getElementAt(it)
+        }.toMutableList(),
+        commandTimeoutSeconds = (commandTimeoutSpinner.value as Number).toInt(),
     )
 
     private fun selectedProviderId(): String? =
