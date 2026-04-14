@@ -10,6 +10,7 @@ export interface Bridge {
   sendMessage: (text: string, includeContext: boolean) => void
   newChat: () => void
   openSettings: () => void
+  cancelStream: () => void
   frontendReady: () => void
   onStart: (msgId: string) => void
   onToken: (token: string) => void

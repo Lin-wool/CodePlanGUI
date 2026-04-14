@@ -40,6 +40,7 @@ export function useBridge(callbacks: BridgeCallbacks) {
           sendMessage: () => {},
           newChat: () => {},
           openSettings: () => {},
+          cancelStream: () => {},
           frontendReady: () => {},
           onStart: currentCallbacks.onStart,
           onToken: currentCallbacks.onToken,

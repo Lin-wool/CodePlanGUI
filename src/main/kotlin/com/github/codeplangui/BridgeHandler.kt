@@ -24,6 +24,7 @@ internal interface BridgeCommands {
     fun newChat()
     fun openSettings()
     fun onFrontendReady()
+    fun cancelStream()
 }
 
 internal fun dispatchBridgeRequest(
@@ -37,6 +38,7 @@ internal fun dispatchBridgeRequest(
         "newChat" -> commands.newChat()
         "openSettings" -> commands.openSettings()
         "frontendReady" -> commands.onFrontendReady()
+        "cancelStream" -> commands.cancelStream()
     }
 }
 
@@ -104,6 +106,10 @@ class BridgeHandler(
                     override fun onFrontendReady() {
                         chatService.onFrontendReady()
                     }
+
+                    override fun cancelStream() {
+                        chatService.cancelStream()
+                    }
                 })) {
                 BridgePayloadHandlingResult.Success -> null
                 BridgePayloadHandlingResult.MalformedPayload -> {
@@ -134,6 +140,9 @@ class BridgeHandler(
                             },
                             openSettings: function() {
                                 ${sendQuery.inject("""JSON.stringify({type:'openSettings',text:''})""")}
+                            },
+                            cancelStream: function() {
+                                ${sendQuery.inject("""JSON.stringify({type:'cancelStream',text:''})""")}
                             },
                             frontendReady: function() {
                                 ${sendQuery.inject("""JSON.stringify({type:'frontendReady',text:''})""")}

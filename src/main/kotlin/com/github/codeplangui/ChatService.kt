@@ -145,6 +145,18 @@ class ChatService(private val project: Project) : Disposable {
         }
     }
 
+    fun cancelStream() {
+        val wasStreaming = activeMessageId != null
+        activeStream?.cancel()
+        activeStream = null
+        val msgId = activeMessageId
+        activeMessageId = null
+        if (wasStreaming && msgId != null) {
+            publishStatus()
+            bridgeHandler?.notifyEnd(msgId)
+        }
+    }
+
     fun newChat() {
         activeStream?.cancel()
         activeStream = null
