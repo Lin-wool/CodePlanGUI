@@ -84,6 +84,13 @@ class ShellPlatformTest {
         ))
     }
 
+    @Test
+    fun `Unix hasPathsOutside returns true for dev path traversal`() {
+        assertTrue(ShellPlatform.Unix.hasPathsOutsideWorkspace(
+            "cat /dev/../../etc/passwd", "/home/user/project"
+        ))
+    }
+
     // ── Windows.hasPathsOutsideWorkspace ─────────────────────────────
 
     @Test

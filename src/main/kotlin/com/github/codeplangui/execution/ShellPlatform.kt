@@ -20,6 +20,11 @@ sealed class ShellPlatform {
 
     object Unix : ShellPlatform() {
 
+        private val SAFE_DEV_PATHS = setOf(
+            "/dev/null", "/dev/stdin", "/dev/stdout", "/dev/stderr",
+            "/dev/zero", "/dev/urandom", "/dev/random"
+        )
+
         override fun buildProcess(command: String, workDir: File): ProcessBuilder =
             ProcessBuilder("sh", "-c", command).directory(workDir)
 
@@ -35,7 +40,7 @@ sealed class ShellPlatform {
                 if (token.startsWith('-')) return@any false
                 val expanded = if (token.startsWith("~/")) home + token.drop(1) else token
                 if (!expanded.startsWith('/')) return@any false
-                if (expanded.startsWith("/dev/")) return@any false
+                if (expanded in SAFE_DEV_PATHS) return@any false
                 !expanded.trimEnd('/').startsWith(normalizedBase)
             }
         }
