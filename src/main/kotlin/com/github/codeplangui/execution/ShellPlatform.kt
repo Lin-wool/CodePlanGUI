@@ -1,5 +1,11 @@
 package com.github.codeplangui.execution
 
+import com.github.codeplangui.api.FunctionDefinition
+import com.github.codeplangui.api.ToolDefinition
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 
 sealed class ShellPlatform {
@@ -10,6 +16,7 @@ sealed class ShellPlatform {
     abstract fun toolName(): String
     abstract fun shellHint(): String
     abstract fun defaultWhitelist(): List<String>
+    abstract fun toolDefinition(): ToolDefinition
 
     object Unix : ShellPlatform() {
 
@@ -34,6 +41,33 @@ sealed class ShellPlatform {
         override fun toolName() = "run_command"
 
         override fun shellHint() = ""
+
+        override fun toolDefinition(): ToolDefinition = ToolDefinition(
+            type = "function",
+            function = FunctionDefinition(
+                name = "run_command",
+                description = "Execute a shell command in the project root directory. " +
+                    "Only use when the user asks you to run something or when you need to " +
+                    "inspect state to answer accurately.",
+                parameters = buildJsonObject {
+                    put("type", "object")
+                    put("properties", buildJsonObject {
+                        put("command", buildJsonObject {
+                            put("type", "string")
+                            put("description", "The bash/shell command to execute")
+                        })
+                        put("description", buildJsonObject {
+                            put("type", "string")
+                            put("description", "One-line explanation of why you are running this command")
+                        })
+                    })
+                    put("required", buildJsonArray {
+                        add(JsonPrimitive("command"))
+                        add(JsonPrimitive("description"))
+                    })
+                }
+            )
+        )
 
         override fun defaultWhitelist(): List<String> = mutableListOf(
             "cargo", "gradle", "mvn", "npm", "yarn", "pnpm",
@@ -77,6 +111,33 @@ sealed class ShellPlatform {
 
         override fun shellHint() =
             "\n当前运行在 Windows 环境，请使用 PowerShell 语法调用 run_powershell 工具。"
+
+        override fun toolDefinition(): ToolDefinition = ToolDefinition(
+            type = "function",
+            function = FunctionDefinition(
+                name = "run_powershell",
+                description = "Execute a PowerShell command in the project root directory. " +
+                    "Only use when the user asks you to run something or when you need to " +
+                    "inspect state to answer accurately. Use PowerShell syntax.",
+                parameters = buildJsonObject {
+                    put("type", "object")
+                    put("properties", buildJsonObject {
+                        put("command", buildJsonObject {
+                            put("type", "string")
+                            put("description", "The PowerShell command to execute")
+                        })
+                        put("description", buildJsonObject {
+                            put("type", "string")
+                            put("description", "One-line explanation of why you are running this command")
+                        })
+                    })
+                    put("required", buildJsonArray {
+                        add(JsonPrimitive("command"))
+                        add(JsonPrimitive("description"))
+                    })
+                }
+            )
+        )
 
         override fun defaultWhitelist(): List<String> = mutableListOf(
             "cargo", "gradle", "mvn", "npm", "yarn", "pnpm",
