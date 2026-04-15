@@ -484,7 +484,7 @@ $selection
             PreparedToolCall(
                 index = accumulated.index,
                 id = toolCallId,
-                functionName = accumulated.functionName ?: "run_command",
+                functionName = accumulated.functionName ?: ShellPlatform.current().toolName(),
                 argumentsJson = argsJson,
                 command = command,
                 description = description

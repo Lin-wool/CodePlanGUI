@@ -41,7 +41,8 @@ sealed class ShellPlatform {
                 val expanded = if (token.startsWith("~/")) home + token.drop(1) else token
                 if (!expanded.startsWith('/')) return@any false
                 if (expanded in SAFE_DEV_PATHS) return@any false
-                !expanded.trimEnd('/').startsWith(normalizedBase)
+                val trimmedExpanded = expanded.trimEnd('/')
+                trimmedExpanded != normalizedBase && !trimmedExpanded.startsWith("$normalizedBase/")
             }
         }
 
@@ -110,7 +111,7 @@ sealed class ShellPlatform {
                 val normalized = token.replace('/', '\\')
                 val isAbsolute = normalized.matches(Regex("[A-Za-z]:\\\\.*")) || normalized.startsWith("\\\\")
                 if (!isAbsolute) return@any false
-                !normalized.startsWith(normalizedBase)
+                normalized != normalizedBase && !normalized.startsWith("$normalizedBase\\")
             }
         }
 

@@ -91,6 +91,20 @@ class ShellPlatformTest {
         ))
     }
 
+    @Test
+    fun `Unix hasPathsOutside returns true for path that shares prefix with project`() {
+        assertTrue(ShellPlatform.Unix.hasPathsOutsideWorkspace(
+            "cat /home/user/project-evil/secret.txt", "/home/user/project"
+        ))
+    }
+
+    @Test
+    fun `Unix hasPathsOutside returns false for exact project root path`() {
+        assertFalse(ShellPlatform.Unix.hasPathsOutsideWorkspace(
+            "ls /home/user/project", "/home/user/project"
+        ))
+    }
+
     // ── Windows.hasPathsOutsideWorkspace ─────────────────────────────
 
     @Test
@@ -126,6 +140,22 @@ class ShellPlatformTest {
     fun `Windows hasPathsOutside returns false for flag tokens`() {
         assertFalse(ShellPlatform.Windows.hasPathsOutsideWorkspace(
             "Get-ChildItem -Recurse C:\\Users\\user\\project\\src",
+            "C:\\Users\\user\\project"
+        ))
+    }
+
+    @Test
+    fun `Windows hasPathsOutside returns true for path that shares prefix with project`() {
+        assertTrue(ShellPlatform.Windows.hasPathsOutsideWorkspace(
+            "Get-Content C:\\Users\\user\\project-evil\\secret.txt",
+            "C:\\Users\\user\\project"
+        ))
+    }
+
+    @Test
+    fun `Windows hasPathsOutside returns false for exact project root path`() {
+        assertFalse(ShellPlatform.Windows.hasPathsOutsideWorkspace(
+            "Get-ChildItem C:\\Users\\user\\project",
             "C:\\Users\\user\\project"
         ))
     }
