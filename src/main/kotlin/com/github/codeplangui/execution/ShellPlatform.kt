@@ -9,7 +9,7 @@ sealed class ShellPlatform {
     abstract fun hasPathsOutsideWorkspace(command: String, basePath: String): Boolean
     abstract fun toolName(): String
     abstract fun shellHint(): String
-    abstract fun defaultWhitelist(): MutableList<String>
+    abstract fun defaultWhitelist(): List<String>
 
     object Unix : ShellPlatform() {
 
@@ -35,7 +35,7 @@ sealed class ShellPlatform {
 
         override fun shellHint() = ""
 
-        override fun defaultWhitelist() = mutableListOf(
+        override fun defaultWhitelist(): List<String> = mutableListOf(
             "cargo", "gradle", "mvn", "npm", "yarn", "pnpm",
             "git", "ls", "cat", "grep", "find", "echo", "pwd"
         )
@@ -78,7 +78,7 @@ sealed class ShellPlatform {
         override fun shellHint() =
             "\n当前运行在 Windows 环境，请使用 PowerShell 语法调用 run_powershell 工具。"
 
-        override fun defaultWhitelist() = mutableListOf(
+        override fun defaultWhitelist(): List<String> = mutableListOf(
             "cargo", "gradle", "mvn", "npm", "yarn", "pnpm",
             "git",
             "Get-ChildItem", "Get-Content", "Select-String",
