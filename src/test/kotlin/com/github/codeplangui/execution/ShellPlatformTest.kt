@@ -63,6 +63,27 @@ class ShellPlatformTest {
         assertFalse(ShellPlatform.Unix.hasPathsOutsideWorkspace("ls -la /home/user/project/src", "/home/user/project"))
     }
 
+    @Test
+    fun `Unix hasPathsOutside returns false when basePath has trailing slash`() {
+        assertFalse(ShellPlatform.Unix.hasPathsOutsideWorkspace(
+            "find /home/user/project -name \"*.kt\"", "/home/user/project/"
+        ))
+    }
+
+    @Test
+    fun `Unix hasPathsOutside returns false for dev null redirect token`() {
+        assertFalse(ShellPlatform.Unix.hasPathsOutsideWorkspace(
+            "find /home/user/project -name \"*.java\" 2>/dev/null", "/home/user/project"
+        ))
+    }
+
+    @Test
+    fun `Unix hasPathsOutside returns false for spaced dev null redirect`() {
+        assertFalse(ShellPlatform.Unix.hasPathsOutsideWorkspace(
+            "find /home/user/project -name \"*.java\" 2> /dev/null | head -20", "/home/user/project"
+        ))
+    }
+
     // ── Windows.hasPathsOutsideWorkspace ─────────────────────────────
 
     @Test

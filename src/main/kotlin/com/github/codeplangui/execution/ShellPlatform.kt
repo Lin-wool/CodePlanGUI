@@ -30,11 +30,13 @@ sealed class ShellPlatform {
 
         override fun hasPathsOutsideWorkspace(command: String, basePath: String): Boolean {
             val home = System.getProperty("user.home") ?: ""
+            val normalizedBase = basePath.trimEnd('/')
             return command.split("\\s+".toRegex()).any { token ->
                 if (token.startsWith('-')) return@any false
                 val expanded = if (token.startsWith("~/")) home + token.drop(1) else token
                 if (!expanded.startsWith('/')) return@any false
-                !expanded.startsWith(basePath)
+                if (expanded.startsWith("/dev/")) return@any false
+                !expanded.trimEnd('/').startsWith(normalizedBase)
             }
         }
 
