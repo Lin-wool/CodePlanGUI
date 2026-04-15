@@ -4,9 +4,9 @@ import com.github.codeplangui.api.OkHttpSseClient
 import com.github.codeplangui.api.ToolCallAccumulator
 import com.github.codeplangui.api.ToolCallDelta
 import com.github.codeplangui.api.ToolDefinition
-import com.github.codeplangui.api.FunctionDefinition
 import com.github.codeplangui.execution.CommandExecutionService
 import com.github.codeplangui.execution.ExecutionResult
+import com.github.codeplangui.execution.ShellPlatform
 import com.github.codeplangui.model.ChatSession
 import com.github.codeplangui.model.Message
 import com.github.codeplangui.model.MessageRole
@@ -30,9 +30,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -229,32 +226,8 @@ class ChatService(private val project: Project) : Disposable {
         publishStatus()
     }
 
-    private fun runCommandToolDefinition(): ToolDefinition = ToolDefinition(
-        type = "function",
-        function = FunctionDefinition(
-            name = "run_command",
-            description = "Execute a shell command in the project root directory. " +
-                "Only use when the user asks you to run something or when you need to " +
-                "inspect state to answer accurately.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                put("properties", buildJsonObject {
-                    put("command", buildJsonObject {
-                        put("type", "string")
-                        put("description", "The shell command to execute")
-                    })
-                    put("description", buildJsonObject {
-                        put("type", "string")
-                        put("description", "One-line explanation of why you are running this command")
-                    })
-                })
-                put("required", buildJsonArray {
-                    add(JsonPrimitive("command"))
-                    add(JsonPrimitive("description"))
-                })
-            }
-        )
-    )
+    private fun runCommandToolDefinition(): ToolDefinition =
+        ShellPlatform.current().toolDefinition()
 
     private fun handleToolCallChunk(delta: ToolCallDelta) {
         toolCallAccumulator.append(delta)
@@ -511,7 +484,7 @@ $selection
             PreparedToolCall(
                 index = accumulated.index,
                 id = toolCallId,
-                functionName = accumulated.functionName ?: "run_command",
+                functionName = accumulated.functionName ?: ShellPlatform.current().toolName(),
                 argumentsJson = argsJson,
                 command = command,
                 description = description
@@ -749,10 +722,11 @@ internal fun buildSelectionContextLabel(fileName: String?, lineCount: Int): Stri
 
 internal fun buildBaseSystemPrompt(commandExecutionEnabled: Boolean = false): String =
     if (commandExecutionEnabled) {
+        val platform = ShellPlatform.current()
         """
 你是一个代码助手。请简洁准确地回答用户问题。
-你拥有 run_command 工具，可以在用户项目根目录执行 shell 命令。
-当用户请求运行命令、查看文件、执行构建或测试时，主动调用该工具获取真实结果后再作答。
+你拥有 ${platform.toolName()} 工具，可以在用户项目根目录执行命令。
+当用户请求运行命令、查看文件、执行构建或测试时，主动调用该工具获取真实结果后再作答。${platform.shellHint()}
         """.trimIndent()
     } else {
         """

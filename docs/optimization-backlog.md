@@ -87,3 +87,4 @@
 | ~~X-02~~ | 流式输出无法中断 | PR #3 cancel stream + ESC | 2024 |
 | ~~U-07~~ | 命令执行卡片展示顺序错误：执行结果在下、AI 响应在上，用户无法第一时间看到回复 | 引入 bridgeNotifiedStart 延迟 notifyStart，工具启用时气泡在 ExecutionCard 之后创建 | 2025-04-15 |
 | ~~U-08~~ | 命令执行完成后卡片不自动折叠，占据大量空间；缺少展开/折叠按钮 | ExecutionCard 完成后默认折叠，提供点击展开 | 2025-04-15 |
+| ~~A-05~~ | `CommandExecutionService` 硬编码 `sh -c`，仅支持 Unix；路径校验和默认白名单也是 Unix-only | 引入 `ShellPlatform` sealed class（Unix/Windows），封装 ProcessBuilder、路径校验、工具定义、白名单；ChatService 和 Settings 均委托给 `ShellPlatform.current()` | 2026-04-15 |
